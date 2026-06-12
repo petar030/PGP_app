@@ -5,15 +5,10 @@ import sys
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-API_DIR = PROJECT_ROOT / "api"
 
-for path in (API_DIR, PROJECT_ROOT):
-    if str(path) not in sys.path:
-        sys.path.insert(0, str(path))
-
-from encryption_services import encrypt_message
-from output_utils import (
+from rsa_keyring.keyring_utils import ( calculate_key_id_hex)
+from api.encryption_services import encrypt_message
+from api.output_utils import (
     crc24,
     decode_radix64,
     deserialize_final_packet,
@@ -27,6 +22,7 @@ class TestOutputUtils(unittest.TestCase):
     def setUpClass(cls):
         cls.private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         cls.public_key = cls.private_key.public_key()
+        cls.public_key_id = calculate_key_id_hex(cls.public_key)
         cls.expected_key_id = cls.public_key.public_bytes(
             encoding=serialization.Encoding.DER,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
@@ -44,6 +40,7 @@ class TestOutputUtils(unittest.TestCase):
         encrypted_packet = encrypt_message(
             compressed_bytes=b"\x00hello-world",
             receiver_public_key=self.public_key,
+            receiver_key_id=self.public_key_id,
             symmetric_algo="AES128",
         )
 
@@ -60,6 +57,7 @@ class TestOutputUtils(unittest.TestCase):
         encrypted_packet = encrypt_message(
             compressed_bytes=b"test-cast5-payload",
             receiver_public_key=self.public_key,
+            receiver_key_id=self.public_key_id,
             symmetric_algo="Cast5",
         )
 
@@ -110,6 +108,7 @@ class TestOutputUtils(unittest.TestCase):
         encrypted_packet = encrypt_message(
             compressed_bytes=b"\x00hello-world",
             receiver_public_key=self.public_key,
+            receiver_key_id=self.public_key_id,
             symmetric_algo="AES128",
         )
 

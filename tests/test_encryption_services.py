@@ -5,13 +5,15 @@ import sys
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 
+from rsa_keyring.keyring_utils import calculate_key_id_hex
+
 # Support direct execution from tests/ and discovery from project root.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from api.encryption_services import decrypt_message, encrypt_message
-
+from rsa_keyring.keyring_utils import calculate_key_id, key_id_to_hex
 
 class TestEncryptionServices(unittest.TestCase):
     @classmethod
@@ -19,6 +21,7 @@ class TestEncryptionServices(unittest.TestCase):
         """Generate one RSA keypair and reusable payload for all tests."""
         cls.private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         cls.public_key = cls.private_key.public_key()
+        cls.receiver_key_id = calculate_key_id_hex(cls.public_key)
         cls.key_id = cls.public_key.public_bytes(
             encoding=serialization.Encoding.DER,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
@@ -29,6 +32,7 @@ class TestEncryptionServices(unittest.TestCase):
         encrypted_res = encrypt_message(
             compressed_bytes=self.mock_compressed_bytes,
             receiver_public_key=self.public_key,
+            receiver_key_id=self.receiver_key_id,
             symmetric_algo="AES128",
         )
 
@@ -44,13 +48,13 @@ class TestEncryptionServices(unittest.TestCase):
         )
 
         self.assertEqual(decrypted_res["decrypted_data"], self.mock_compressed_bytes)
-        self.assertEqual(decrypted_res["receiver_key_id"], self.key_id)
         self.assertEqual(decrypted_res["symmetric_algo"], "AES128")
 
     def test_encrypt_decrypt_roundtrip_cast5(self):
         encrypted_res = encrypt_message(
             compressed_bytes=self.mock_compressed_bytes,
             receiver_public_key=self.public_key,
+            receiver_key_id=self.receiver_key_id,
             symmetric_algo="Cast5",
         )
 
@@ -68,6 +72,7 @@ class TestEncryptionServices(unittest.TestCase):
             encrypt_message(
                 compressed_bytes=self.mock_compressed_bytes,
                 receiver_public_key=self.public_key,
+                receiver_key_id=self.receiver_key_id,
                 symmetric_algo="3DES",
             )
 
@@ -75,6 +80,7 @@ class TestEncryptionServices(unittest.TestCase):
         encrypted_res = encrypt_message(
             compressed_bytes=self.mock_compressed_bytes,
             receiver_public_key=self.public_key,
+            receiver_key_id=self.receiver_key_id,
             symmetric_algo="AES128",
         )
 
