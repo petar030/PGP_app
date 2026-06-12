@@ -7,7 +7,7 @@ from typing import Any
 from .auth_services import create_message_component, sign_message
 from .compression_utils import compress_data
 from .encryption_services import encrypt_message
-from .radix_utils import encode_radix64
+from .output_utils import encode_radix64
 
 
 def build_final_packet(*args: Any, **kwargs: Any) -> str:

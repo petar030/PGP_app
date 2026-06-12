@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
 
 # Support direct execution from tests/ and discovery from project root.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -18,18 +19,21 @@ class TestEncryptionServices(unittest.TestCase):
         """Generate one RSA keypair and reusable payload for all tests."""
         cls.private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         cls.public_key = cls.private_key.public_key()
-        cls.key_id = "ETF_ETF_2026_ID"
+        cls.key_id = cls.public_key.public_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )[-8:]
         cls.mock_compressed_bytes = b"\x01Pozdrav sa ETF-a! Ovo je tajna PGP poruka."
 
     def test_encrypt_decrypt_roundtrip_aes128(self):
         encrypted_res = encrypt_message(
             compressed_bytes=self.mock_compressed_bytes,
             receiver_public_key=self.public_key,
-            receiver_key_id=self.key_id,
             symmetric_algo="AES128",
         )
 
         self.assertEqual(encrypted_res["receiver_key_id"], self.key_id)
+        self.assertIsInstance(encrypted_res["receiver_key_id"], bytes)
         self.assertEqual(encrypted_res["symmetric_algo"], "AES128")
         self.assertIsInstance(encrypted_res["session_key"], bytes)
         self.assertIsInstance(encrypted_res["encrypted_data"], bytes)
@@ -47,7 +51,6 @@ class TestEncryptionServices(unittest.TestCase):
         encrypted_res = encrypt_message(
             compressed_bytes=self.mock_compressed_bytes,
             receiver_public_key=self.public_key,
-            receiver_key_id=self.key_id,
             symmetric_algo="Cast5",
         )
 
@@ -65,7 +68,6 @@ class TestEncryptionServices(unittest.TestCase):
             encrypt_message(
                 compressed_bytes=self.mock_compressed_bytes,
                 receiver_public_key=self.public_key,
-                receiver_key_id=self.key_id,
                 symmetric_algo="3DES",
             )
 
@@ -73,7 +75,6 @@ class TestEncryptionServices(unittest.TestCase):
         encrypted_res = encrypt_message(
             compressed_bytes=self.mock_compressed_bytes,
             receiver_public_key=self.public_key,
-            receiver_key_id=self.key_id,
             symmetric_algo="AES128",
         )
 

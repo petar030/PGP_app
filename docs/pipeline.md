@@ -27,6 +27,25 @@ Ova funkcija uzima sirovi sadržaj fajla i pakuje ga sa metapodacima (ime fajla 
     }
     ```
 
+### - [ ] 1b. Unwarp komponente poruke (`extract_message_component`)
+Ova funkcija predstavlja obrnuti tok za `create_message_component`. Prima serijalizovan ili pakovan sadržaj poruke i vraća originalni skup metapodataka i sirovih bajtova.
+
+* **Potpis funkcije:**
+    ```python
+    def extract_message_component(packed_message: dict) -> dict:
+        pass
+    ```
+* **Ulazni argumenti:**
+    * `packed_message` (`dict`): Pakovana poruka dobijena nakon pripreme podataka.
+* **Povratna vrednost (`dict`):**
+    ```python
+    {
+        'filename': str,      # Naziv fajla
+        'timestamp': int,     # Vreme kreiranja
+        'data': bytes         # Originalni sirovi podaci fajla
+    }
+    ```
+
 ---
 
 ### - [ ] 2. Digitalno potpisivanje (`sign_message`)
@@ -52,6 +71,26 @@ Ukoliko je izabrana opcija potpisivanja, ova funkcija generiše SHA-1 hash nad c
     }
     ```
 
+### - [ ] 2b. Verifikacija potpisa (`verify_signature`)
+Ova funkcija predstavlja obrnuti tok za `sign_message`. Ona proverava da li je digitalni potpis validan koristeći javni ključ pošiljaoca i da li hash poruke odgovara potpisanim podacima. Ako je potpis ispravan, vraća originalnu komponentu poruke i rezultat provere.
+
+* **Potpis funkcije:**
+    ```python
+    def verify_signature(signed_packet: dict, sender_public_key: object) -> dict:
+        pass
+    ```
+* **Ulazni argumenti:**
+    * `signed_packet` (`dict`): Rečnik dobijen iz `sign_message`.
+    * `sender_public_key` (`object`): RSA javni ključ pošiljaoca.
+* **Povratna vrednost (`dict`):**
+    ```python
+    {
+        'is_valid': bool,           # Rezultat provere potpisa
+        'sender_key_id': str,       # ID ključa pošiljaoca
+        'message_comp': dict        # Originalna komponenta poruke iz potpisanog paketa
+    }
+    ```
+
 ---
 
 ### - [ ] 3. Kompresija i postavljanje flega (`compress_data`)
@@ -70,50 +109,104 @@ Ova funkcija prima serijalizovane bajtove (bilo samo poruke, bilo paketa sa potp
     * Ukoliko je `perform_compression=True`: Vraća `b'\x01' + zip_compressed_bytes`
     * Ukoliko je `perform_compression=False`: Vraća `b'\x00' + serialized_data`
 
+### - [ ] 3b. Dekompresija i uklanjanje flega (`decompress_data`)
+Ova funkcija prima bajtove dobijene nakon dekripcije i vraća originalni sadržaj bez flega za kompresiju. Ukoliko je prvi bajt `b'\x01'`, sadržaj nakon njega se dekompresuje ZIP mehanizmom. Ukoliko je prvi bajt `b'\x00'`, ostatak niza se vraća neizmenjen.
+
+* **Potpis funkcije:**
+    ```python
+    def decompress_data(compressed_bytes: bytes) -> bytes:
+        pass
+    ```
+* **Ulazni argumenti:**
+    * `compressed_bytes` (`bytes`): Bajtovi iz `decode_radix64` ili `decrypt_message`, sa flegom na početku.
+* **Povratna vrednost (`bytes`):**
+    * Originalni serijalizovani podaci pre kompresije.
+
 ---
 
 ## DEO 2: Tajnost (Enkripcija) i Radix-64 Prenos
 
-### - [ ] 4. Enkripcija poruke i ključa sesije (`encrypt_message`)
+### - [x] 4. Enkripcija poruke i ključa sesije (`encrypt_message`)
 Ova funkcija generiše jednokratni ključ sesije ($K_s$) za izabrani simetrični algoritam. Ona uzima kompletan niz bajtova iz koraka kompresije (zajedno sa zalepljenim flegom) i simetrično ga šifruje. Ključ sesije se šifruje javnim ključem primaoca.
 
 * **Potpis funkcije:**
     ```python
-    def encrypt_message(compressed_bytes: bytes, receiver_public_key: object, receiver_key_id: str, symmetric_algo: str) -> dict:
+    def encrypt_message(compressed_bytes: bytes, receiver_public_key: object, symmetric_algo: str) -> dict:
         pass
     ```
 * **Ulazni argumenti:**
     * `compressed_bytes` (`bytes`): Finalni niz bajtova dobijen iz `compress_data` (sadrži fleg na početku).
     * `receiver_public_key` (`object`): RSA javni ključ primaoca poruke.
-    * `receiver_key_id` (`str`): ID javnog ključa primaoca poruke.
     * `symmetric_algo` (`str`): Naziv izabranog simetričnog algoritma (npr. `'AES128'`, `'3DES'`).
 * **Povratna vrednost (`dict`):**
     ```python
     {
-        'receiver_key_id': str,       # ID ključa primaoca
+        'receiver_key_id': bytes,     # Poslednjih 8 bajtova serijalizovanog javnog ključa primaoca
         'session_key': bytes,         # Ključ sesije (Ks) šifrovan pomoću receiver_public_key
         'symmetric_algo': str,        # Naziv algoritma korišćenog za enkripciju podataka
         'encrypted_data': bytes       # Simetrično šifrovan ceo niz [E(Ks, compressed_bytes)]
     }
     ```
 
----
-
-### - [ ] 5. Radix-64 kodiranje (`encode_radix64`)
-Finalni korak koji uzima rečnik iz faze enkripcije, serijalizuje ga u jedinstven niz bajtova (komponenta ključa sesije + enkriptovani podaci) i pretvara ga u čitljiv ASCII format oklopljen PGP zaglavljima. Ako enkripcija nije bila selektovana, funkcija direktno uzima izlaz iz koraka 3 (`compress_data`) i radi Radix-64.
+### - [x] 4b. Dekripcija poruke i ključa sesije (`decrypt_message`)
+Ova funkcija predstavlja obrnuti korak od `encrypt_message`. Prvo koristi privatni ključ primaoca da dešifruje ključ sesije, a zatim koristi dobijeni ključ i metadata o algoritmu da simetrično dešifruje podatke.
 
 * **Potpis funkcije:**
     ```python
-    def encode_radix64(final_packet_dict: dict, is_encrypted: bool) -> str:
+    def decrypt_message(encrypted_message: dict, receiver_private_key: object) -> dict:
         pass
     ```
 * **Ulazni argumenti:**
-    * `final_packet_dict` (`dict`): Rečnik iz koraka 4 (ako ima enkripcije). Ako nema enkripcije, ovde se može proslediti prigodan rečnik koji sadrži samo bajtove iz koraka 3 radi konzistentnosti API-ja.
-    * `is_encrypted` (`bool`): Indikator da li prosleđeni paket sadrži šifrovane komponente ključa sesije ili ne (određuje format serijalizacije).
-* **Povratna vrednost (`str`):**
-    * ASCII string sa standardnim PGP omotačem:
+    * `encrypted_message` (`dict`): Rečnik dobijen iz `encrypt_message`.
+    * `receiver_private_key` (`object`): RSA privatni ključ primaoca poruke.
+* **Povratna vrednost (`dict`):**
+    ```python
+    {
+        'decrypted_data': bytes,     # Originalni bajtovi pre enkripcije
+        'symmetric_algo': str        # Simetrični algoritam koji je korišćen
+    }
+    ```
+
+---
+## DEO 3: Serijalizacija, Radix-64 i Prenos
+Ovaj deo definiše dva alternativna izlaza za isti ulazni rečnik iz prethodne faze. Korisnik ili implementacija bira jedan od dva formata:
+* čista binarna serijalizacija preko `serialize_final_packet`
+* ASCII oklop preko `encode_radix64`, koji koristi isti ulazni `data_dict` i interno prvo radi serijalizaciju, pa onda Base64 omotavanje
+
+### - [ ] 5. Čista serijalizacija finalnog paketa (`serialize_final_packet`)
+
+
+**Format (Big-Endian):**
+(Fiksna struktura - 26 bajtova + podaci)
+1. **Fleg (1 bajt):** `0x01` ako je paket enkriptovan, `0x00` ako nije.
+2. **Ako je enkriptovan :**
+    - `receiver_key_id` (8 bajtova, poslednjih 8 bajtova serijalizovanog javnog ključa)
+    - `symmetric_algo` (1 bajt, enum vrednost u skladu sa implementacijom AES128(0x00), Cast5(0x01))
+    - `encrypted_key_length` (dužina šifrovanog sesijskog ključa)
+    - `encrypted_key` (2 bajta, Duzina zavisna od prethodne vrednosti)
+    - `encrypted_data` (Varijabilna dužina)
+3. **Ako nije enkriptovan:**
+    - `encrypted_data` (Varijabilna dužina)
+
+* **Potpis:** `def serialize_final_packet(data_dict: dict, is_encrypted: bool) -> bytes:`
+
+### - [ ] 5b. Unwrap finalnog paketa (`deserialize_final_packet`)
+Parsira binarni stream i rekonstruiše rečnik.
+
+* **Potpis:** `def deserialize_final_packet(serialized_packet: bytes) -> dict:`
+
+### - [ ] 6. Radix-64 kodiranje (`encode_radix64`)
+Opcioni korak koji uzima isti ulazni rečnik kao `serialize_final_packet`, interno ga serijalizuje i zatim konvertuje binarni izlaz u Base64 ASCII string sa PGP zaglavljima.
+
+* **Potpis:** `def encode_radix64(serialized_data) -> str:`
+* **Struktura:**
     ```text
     -----BEGIN PGP MESSAGE-----
-    [Radix-64 tekstualni sadržaj]
+    [Base64 kodirani binarni paket]
     -----END PGP MESSAGE-----
     ```
+
+### - [ ] 6b. Radix-64 dekodiranje (`decode_radix64`)
+Skida PGP zaglavlja i dekodira Base64 u originalni binarni niz bajtova.
+
+* **Potpis:** `def decode_radix64(armored_message: str) -> bytes:`
