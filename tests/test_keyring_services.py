@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import rsa_keyring.keyring_services as services
 import rsa_keyring.keyring_storage as storage
+import rsa_keyring.keyring_utils as utils
 from rsa_keyring.keyring_utils import key_id_to_hex
 
 
@@ -189,7 +190,7 @@ class TestKeyringServices(unittest.TestCase):
             password="test-password",
         )
 
-        private_key = services.unlock_private_key(private_entry["key_id"], "test-password")
+        private_key = utils.load_private_key_from_pem(private_entry["encrypted_private_key_pem"], "test-password")
 
         self.assertIsInstance(private_key, RSAPrivateKey)
 
@@ -202,7 +203,7 @@ class TestKeyringServices(unittest.TestCase):
         )
 
         with self.assertRaises(ValueError):
-            services.unlock_private_key(private_entry["key_id"], "wrong-password")
+            utils.load_private_key_from_pem(private_entry["encrypted_private_key_pem"], "wrong-password")
 
     def test_export_public_key_creates_pem_file(self):
         public_entry, _ = services.generate_key_pair(
@@ -318,7 +319,7 @@ class TestKeyringServices(unittest.TestCase):
         self.assertEqual(imported_public["user_name"], "Imported Pair")
         self.assertEqual(imported_private["user_name"], "Imported Pair")
 
-        unlocked_private_key = services.unlock_private_key(imported_private["key_id"], "new-password")
+        unlocked_private_key = utils.load_private_key_from_pem(imported_private["encrypted_private_key_pem"], "new-password")
 
         self.assertIsInstance(unlocked_private_key, RSAPrivateKey)
 

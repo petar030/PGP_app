@@ -39,7 +39,7 @@ def serialize_public_key_to_pem(public_key) -> str:
     ).decode("utf-8")
 
 
-def serialize_private_key_to_encrypted_pem(private_key, password: str) -> str:
+def serialize_private_key_to_pem(private_key, password: str, encrypted: bool = True) -> str:
     if not isinstance(password, str) or not password:
         raise ValueError("Password is required")
 
@@ -48,7 +48,7 @@ def serialize_private_key_to_encrypted_pem(private_key, password: str) -> str:
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.BestAvailableEncryption(
             password.encode("utf-8")
-        )
+        ) if encrypted else serialization.NoEncryption()
     ).decode("utf-8")
 
 
@@ -74,13 +74,6 @@ def load_private_key_from_pem(private_key_pem: str, password: str | None = None)
 
     return private_key
 
-
-def load_private_key_from_encrypted_pem(encrypted_private_key_pem: str, password: str):
-    return load_private_key_from_pem(encrypted_private_key_pem, password)
-
-
-def get_key_size_from_public_key(public_key) -> int:
-    return public_key.key_size
 
 def key_id_to_hex(key_id: str | bytes) -> str:
     if isinstance(key_id, bytes):

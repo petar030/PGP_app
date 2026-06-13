@@ -16,11 +16,9 @@ from .keyring_utils import (
     generate_rsa_key_pair,
     calculate_key_id_hex,
     serialize_public_key_to_pem,
-    serialize_private_key_to_encrypted_pem,
+    serialize_private_key_to_pem,
     load_public_key_from_pem,
     load_private_key_from_pem,
-    load_private_key_from_encrypted_pem,
-    get_key_size_from_public_key,
     key_id_to_hex,
 )
 
@@ -30,6 +28,7 @@ _private_keyring: dict[str, dict] = {}
 _initialized = False
 
 
+# Keyring initialization
 def initialize_keyrings() -> None:
     global _public_keyring, _private_keyring, _initialized
 
@@ -37,24 +36,22 @@ def initialize_keyrings() -> None:
     _public_keyring = _normalize_keyring(load_public_keyring())
     _private_keyring = _normalize_keyring(load_private_keyring())
     _initialized = True
-
-
 def save_keyrings() -> None:
     _ensure_initialized()
     save_public_keyring(_public_keyring)
     save_private_keyring(_private_keyring)
 
 
+# Retrieving list of keys
 def get_public_keys() -> list[dict]:
     _ensure_initialized()
     return deepcopy(list(_public_keyring.values()))
-
-
 def get_private_keys() -> list[dict]:
     _ensure_initialized()
     return deepcopy(list(_private_keyring.values()))
 
 
+# Key generation
 def generate_key_pair(user_name: str, email: str, key_size: int, password: str) -> tuple[dict, dict]:
     _ensure_initialized()
 
@@ -71,7 +68,7 @@ def generate_key_pair(user_name: str, email: str, key_size: int, password: str) 
         "user_name": user_name.strip(),
         "email": email.strip(),
         "timestamp": timestamp,
-        "key_size": get_key_size_from_public_key(public_key),
+        "key_size": public_key.key_size,
         "public_key_pem": public_key_pem,
     }
 
@@ -80,9 +77,9 @@ def generate_key_pair(user_name: str, email: str, key_size: int, password: str) 
         "user_name": user_name.strip(),
         "email": email.strip(),
         "timestamp": timestamp,
-        "key_size": get_key_size_from_public_key(public_key),
+        "key_size": public_key.key_size,
         "public_key_pem": public_key_pem,
-        "encrypted_private_key_pem": serialize_private_key_to_encrypted_pem(private_key, password),
+        "encrypted_private_key_pem": serialize_private_key_to_pem(private_key, password, encrypted=True),
     }
 
     _public_keyring[key_id] = public_entry
@@ -93,6 +90,7 @@ def generate_key_pair(user_name: str, email: str, key_size: int, password: str) 
     return deepcopy(public_entry), deepcopy(private_entry)
 
 
+# Import/Export
 def import_public_key(file_path: str, user_name: str = "", email: str = "") -> dict:
     _ensure_initialized()
 
@@ -110,7 +108,7 @@ def import_public_key(file_path: str, user_name: str = "", email: str = "") -> d
         "user_name": user_name.strip(),
         "email": email.strip(),
         "timestamp": int(time.time()),
-        "key_size": get_key_size_from_public_key(public_key),
+        "key_size": public_key.key_size,
         "public_key_pem": serialize_public_key_to_pem(public_key),
     }
 
@@ -118,8 +116,6 @@ def import_public_key(file_path: str, user_name: str = "", email: str = "") -> d
     save_public_keyring(_public_keyring)
 
     return deepcopy(entry)
-
-
 def import_key_pair(
     file_path: str,
     user_name: str = "",
@@ -152,7 +148,7 @@ def import_key_pair(
         "user_name": user_name.strip(),
         "email": email.strip(),
         "timestamp": timestamp,
-        "key_size": get_key_size_from_public_key(public_key),
+        "key_size": public_key.key_size,
         "public_key_pem": normalized_public_key_pem,
     }
 
@@ -161,9 +157,9 @@ def import_key_pair(
         "user_name": user_name.strip(),
         "email": email.strip(),
         "timestamp": timestamp,
-        "key_size": get_key_size_from_public_key(public_key),
+        "key_size": public_key.key_size,
         "public_key_pem": normalized_public_key_pem,
-        "encrypted_private_key_pem": serialize_private_key_to_encrypted_pem(private_key, keyring_password),
+        "encrypted_private_key_pem": serialize_private_key_to_pem(private_key, keyring_password, encrypted=True),
     }
 
     _public_keyring[key_id] = public_entry
@@ -172,8 +168,6 @@ def import_key_pair(
     save_keyrings()
 
     return deepcopy(public_entry), deepcopy(private_entry)
-
-
 def export_public_key(key_id: str | bytes, file_path: str) -> None:
     entry = find_public_key(key_id)
 
@@ -181,34 +175,29 @@ def export_public_key(key_id: str | bytes, file_path: str) -> None:
         raise ValueError("Public key not found")
 
     Path(file_path).write_text(entry["public_key_pem"], encoding="utf-8")
-
-
 def export_key_pair(key_id: str | bytes, unlock_password: str, file_path: str) -> None:
     private_entry = find_private_key(key_id)
 
     if private_entry is None:
         raise ValueError("Key pair not found")
 
-    private_key = unlock_private_key(key_id, unlock_password)
-    private_key_pem = _serialize_private_key_to_unencrypted_pem(private_key)
+    private_key = load_private_key_from_pem(private_entry["encrypted_private_key_pem"], unlock_password)
+    private_key_pem = serialize_private_key_to_pem(private_key, unlock_password, encrypted=False)
 
     content = private_entry["public_key_pem"].strip() + "\n" + private_key_pem.strip() + "\n"
 
     Path(file_path).write_text(content, encoding="utf-8")
 
 
+# Keyring index searching
 def find_public_key(key_id: str | bytes) -> dict | None:
     _ensure_initialized()
     entry = _public_keyring.get(key_id_to_hex(key_id))
     return deepcopy(entry) if entry is not None else None
-
-
 def find_private_key(key_id: str | bytes) -> dict | None:
     _ensure_initialized()
     entry = _private_keyring.get(key_id_to_hex(key_id))
     return deepcopy(entry) if entry is not None else None
-
-
 def get_public_key_object(key_id: str | bytes):
     entry = find_public_key(key_id)
 
@@ -218,15 +207,7 @@ def get_public_key_object(key_id: str | bytes):
     return load_public_key_from_pem(entry["public_key_pem"])
 
 
-def unlock_private_key(key_id: str | bytes, password: str):
-    entry = find_private_key(key_id)
-
-    if entry is None:
-        raise ValueError("Private key not found")
-
-    return load_private_key_from_encrypted_pem(entry["encrypted_private_key_pem"], password)
-
-
+# Deleting keys
 def delete_public_key(key_id: str | bytes) -> bool:
     _ensure_initialized()
     key_id_hex = key_id_to_hex(key_id)
@@ -238,8 +219,6 @@ def delete_public_key(key_id: str | bytes) -> bool:
     save_public_keyring(_public_keyring)
 
     return True
-
-
 def delete_key_pair(key_id: str | bytes) -> bool:
     _ensure_initialized()
     key_id_hex = key_id_to_hex(key_id)
@@ -260,11 +239,10 @@ def delete_key_pair(key_id: str | bytes) -> bool:
     return deleted
 
 
+# Helper functions
 def _ensure_initialized() -> None:
     if not _initialized:
         initialize_keyrings()
-
-
 def _normalize_keyring(keyring: dict[str, dict]) -> dict[str, dict]:
     normalized = {}
 
@@ -284,8 +262,6 @@ def _normalize_keyring(keyring: dict[str, dict]) -> dict[str, dict]:
             normalized[normalized_key_id]["encrypted_private_key_pem"] = entry["encrypted_private_key_pem"]
 
     return normalized
-
-
 def _extract_key_pem_block(content: str, is_private: bool = False) -> str:
     """Izdvaja PEM blok za javni ili privatni ključ iz sadržaja."""
     # Definišemo koje tagove tražimo u zavisnosti od tipa ključa
@@ -308,14 +284,6 @@ def _extract_key_pem_block(content: str, is_private: bool = False) -> str:
     # Ako petlja završi, a ništa nismo našli, bacamo grešku
     key_type = "private" if is_private else "public"
     raise ValueError(f"Missing {key_type} key PEM block")
-
-
-def _serialize_private_key_to_unencrypted_pem(private_key) -> str:
-    return private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    ).decode("utf-8")
 
 
 if __name__ == "__main__":
