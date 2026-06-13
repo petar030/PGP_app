@@ -91,6 +91,37 @@ def generate_key_pair(user_name: str, email: str, key_size: int, password: str) 
 
 
 # Import/Export
+def import_key(
+    file_path: str,
+    user_name: str = "",
+    email: str = "",
+    private_key_pem_password: str | None = None,
+    keyring_password: str | None = None,
+) -> dict | tuple[dict, dict]:
+    _ensure_initialized()
+
+    pem_content = Path(file_path).read_text(encoding="utf-8")
+
+    try:
+        _extract_key_pem_block(pem_content, is_private=True)
+        has_private_key = True
+    except ValueError:
+        has_private_key = False
+
+    if has_private_key:
+        return import_key_pair(
+            file_path=file_path,
+            user_name=user_name,
+            email=email,
+            private_key_pem_password=private_key_pem_password,
+            keyring_password=keyring_password,
+        )
+
+    return import_public_key(
+        file_path=file_path,
+        user_name=user_name,
+        email=email,
+    )
 def import_public_key(file_path: str, user_name: str = "", email: str = "") -> dict:
     _ensure_initialized()
 
@@ -121,12 +152,9 @@ def import_key_pair(
     user_name: str = "",
     email: str = "",
     private_key_pem_password: str | None = None,
-    keyring_password: str = "",
+    keyring_password: str | None = None,
 ) -> tuple[dict, dict]:
     _ensure_initialized()
-
-    if not keyring_password:
-        raise ValueError("Keyring password is required")
 
     pem_content = Path(file_path).read_text(encoding="utf-8")
 
@@ -134,7 +162,6 @@ def import_key_pair(
     private_key_pem = _extract_key_pem_block(pem_content, is_private=True)
 
     public_key = load_public_key_from_pem(public_key_pem)
-    private_key = load_private_key_from_pem(private_key_pem, private_key_pem_password)
 
     timestamp = int(time.time())
     key_id = calculate_key_id_hex(public_key)
@@ -142,6 +169,25 @@ def import_key_pair(
 
     if key_id in _private_keyring:
         raise ValueError("Key pair already exists")
+
+    if keyring_password:
+        private_key = load_private_key_from_pem(private_key_pem, private_key_pem_password)
+        private_public_key = private_key.public_key()
+        private_key_id = calculate_key_id_hex(private_public_key)
+
+        if private_key_id != key_id:
+            raise ValueError("Public key and private key do not match")
+
+        encrypted_private_key_pem = serialize_private_key_to_pem(
+            private_key,
+            keyring_password,
+            encrypted=True,
+        )
+    else:
+        if "-----BEGIN ENCRYPTED PRIVATE KEY-----" not in private_key_pem:
+            raise ValueError("Keyring password is required for importing an unencrypted private key")
+
+        encrypted_private_key_pem = private_key_pem
 
     public_entry = {
         "key_id": key_id,
@@ -159,7 +205,7 @@ def import_key_pair(
         "timestamp": timestamp,
         "key_size": public_key.key_size,
         "public_key_pem": normalized_public_key_pem,
-        "encrypted_private_key_pem": serialize_private_key_to_pem(private_key, keyring_password, encrypted=True),
+        "encrypted_private_key_pem": encrypted_private_key_pem,
     }
 
     _public_keyring[key_id] = public_entry
@@ -168,6 +214,7 @@ def import_key_pair(
     save_keyrings()
 
     return deepcopy(public_entry), deepcopy(private_entry)
+
 def export_public_key(key_id: str | bytes, file_path: str) -> None:
     entry = find_public_key(key_id)
 
@@ -175,18 +222,24 @@ def export_public_key(key_id: str | bytes, file_path: str) -> None:
         raise ValueError("Public key not found")
 
     Path(file_path).write_text(entry["public_key_pem"], encoding="utf-8")
-def export_key_pair(key_id: str | bytes, unlock_password: str, file_path: str) -> None:
+def export_key_pair(key_id: str | bytes, unlock_password: str | None, file_path: str) -> None:
     private_entry = find_private_key(key_id)
 
     if private_entry is None:
         raise ValueError("Key pair not found")
 
-    private_key = load_private_key_from_pem(private_entry["encrypted_private_key_pem"], unlock_password)
-    private_key_pem = serialize_private_key_to_pem(private_key, unlock_password, encrypted=False)
 
-    content = private_entry["public_key_pem"].strip() + "\n" + private_key_pem.strip() + "\n"
+    if unlock_password is None:
+        content = private_entry["public_key_pem"].strip() + "\n" + private_entry["encrypted_private_key_pem"].strip() + "\n"
+        Path(file_path).write_text(content, encoding="utf-8")
 
-    Path(file_path).write_text(content, encoding="utf-8")
+    else:
+        private_key = load_private_key_from_pem(private_entry["encrypted_private_key_pem"], unlock_password)
+        private_key_pem = serialize_private_key_to_pem(private_key, unlock_password, encrypted=False)
+        content = private_entry["public_key_pem"].strip() + "\n" + private_key_pem.strip() + "\n"
+        Path(file_path).write_text(content, encoding="utf-8")
+
+    
 
 
 # Keyring index searching
@@ -286,10 +339,3 @@ def _extract_key_pem_block(content: str, is_private: bool = False) -> str:
     raise ValueError(f"Missing {key_type} key PEM block")
 
 
-if __name__ == "__main__":
-    # Primer korišćenja funkcija
-    initialize_keyrings()
-
-    # Generisanje novog para ključeva
-    #public_entry, private_entry = generate_key_pair("Alice", "alice@example.com", 2048, "my_secure_password")
-    print(find_private_key("6598910203010001"))
