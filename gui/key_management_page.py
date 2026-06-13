@@ -163,6 +163,7 @@ class KeyManagementPage(QWidget):
         self.generate_button.clicked.connect(self.on_generate_clicked)
         self.export_button.clicked.connect(self.on_export_clicked)
         self.import_button.clicked.connect(self.on_import_clicked)
+        self.delete_button.clicked.connect(self.on_delete_clicked)
 
     def create_scroll_area(self, content_layout):
         content = QWidget()
@@ -391,6 +392,22 @@ class KeyManagementPage(QWidget):
         }
         """)
     
+    def reset_details_panel(self):
+        self.selected_entry = None
+        self.selected_key_type = None
+
+        self.export_button.setEnabled(False)
+        self.delete_button.setEnabled(False)
+
+        self.clear_details()
+
+        self.details_placeholder = QLabel("Select a key card to view details.")
+        self.details_placeholder.setObjectName("DetailsPlaceholder")
+        self.details_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.details_layout.addWidget(self.details_placeholder)
+        self.details_layout.addStretch()
+
     def on_generate_clicked(self):
         dialog = GenerateKeyDialog(self)
 
@@ -561,5 +578,106 @@ class KeyManagementPage(QWidget):
                 QMessageBox.critical(
                     self,
                     "Export Failed",
+                    str(e),
+                )
+
+    def on_delete_clicked(self):
+        if self.selected_entry is None:
+            QMessageBox.warning(
+                self,
+                "No Key Selected",
+                "Please select a key first.",
+            )
+            return
+
+        key_id = self.selected_entry["key_id"]
+
+        if self.selected_key_type == "public":
+            answer = QMessageBox.question(
+                self,
+                "Delete Public Key",
+                "Are you sure you want to delete this public key?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+
+            try:
+                deleted = keyring_services.delete_public_key(key_id)
+
+                if not deleted:
+                    QMessageBox.warning(
+                        self,
+                        "Delete Failed",
+                        "Public key was not found.",
+                    )
+                    return
+
+                self.refresh_cards()
+                self.reset_details_panel()
+
+                QMessageBox.information(
+                    self,
+                    "Delete Successful",
+                    "Public key has been deleted successfully.",
+                )
+
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Delete Failed",
+                    str(e),
+                )
+
+            return
+
+        if self.selected_key_type == "private":
+            answer = QMessageBox.question(
+                self,
+                "Delete Private Key",
+                "Do you also want to delete the matching public key?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+
+            if answer == QMessageBox.StandardButton.Cancel:
+                return
+
+            delete_public_key_entry = answer == QMessageBox.StandardButton.Yes
+
+            try:
+                deleted = keyring_services.delete_private_key(
+                    key_id,
+                    delete_public_key_entry=delete_public_key_entry,
+                )
+
+                if not deleted:
+                    QMessageBox.warning(
+                        self,
+                        "Delete Failed",
+                        "Private key was not found.",
+                    )
+                    return
+
+                self.refresh_cards()
+                self.reset_details_panel()
+
+                if delete_public_key_entry:
+                    message = "Private key and matching public key have been deleted successfully."
+                else:
+                    message = "Private key has been deleted successfully."
+
+                QMessageBox.information(
+                    self,
+                    "Delete Successful",
+                    message,
+                )
+
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Delete Failed",
                     str(e),
                 )

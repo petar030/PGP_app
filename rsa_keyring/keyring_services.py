@@ -265,6 +265,9 @@ def delete_public_key(key_id: str | bytes) -> bool:
     _ensure_initialized()
     key_id_hex = key_id_to_hex(key_id)
 
+    if key_id_hex in _private_keyring:
+        raise ValueError("Cannot delete public key because matching private key exists")
+
     if key_id_hex not in _public_keyring:
         return False
 
@@ -272,24 +275,21 @@ def delete_public_key(key_id: str | bytes) -> bool:
     save_public_keyring(_public_keyring)
 
     return True
-def delete_key_pair(key_id: str | bytes) -> bool:
+def delete_private_key(key_id: str | bytes, delete_public_key_entry: bool = False) -> bool:
     _ensure_initialized()
     key_id_hex = key_id_to_hex(key_id)
 
-    deleted = False
+    if key_id_hex not in _private_keyring:
+        return False
 
-    if key_id_hex in _public_keyring:
+    del _private_keyring[key_id_hex]
+
+    if delete_public_key_entry and key_id_hex in _public_keyring:
         del _public_keyring[key_id_hex]
-        deleted = True
 
-    if key_id_hex in _private_keyring:
-        del _private_keyring[key_id_hex]
-        deleted = True
+    save_keyrings()
 
-    if deleted:
-        save_keyrings()
-
-    return deleted
+    return True
 
 
 # Helper functions
