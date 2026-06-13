@@ -6,18 +6,18 @@ Ovaj dokument služi kao kontrolna lista (Checklist) i tehnička specifikacija z
 
 ## DEO 1: Priprema podataka, Autentikacija i Kompresija
 
-### - [ ] 1. Kreiranje komponente poruke (`create_message_component`)
+### - [ ] 1. (Obavezno) Kreiranje komponente poruke (`create_message_component`)
 Ova funkcija uzima sirovi sadržaj fajla i pakuje ga sa metapodacima (ime fajla i vreme).
 
 * **Potpis funkcije:**
     ```python
-    def create_message_component(data: bytes, filename: str, timestamp: int) -> dict:
+    def create_message_component(data: str, filename: str) -> dict:
         pass
     ```
 * **Ulazni argumenti:**
-    * `data` (`bytes`): Sirovi binarni podaci ili tekst iz datoteke koja se šalje.
+    * `data` (`str`): Tekst iz datoteke koja se šalje.
     * `filename` (`str`): Naziv originalne datoteke.
-    * `timestamp` (`int`): UNIX timestamp koji označava vreme kreiranja/slanja poruke.
+
 * **Povratna vrednost (`dict`):**
     ```python
     {
@@ -27,7 +27,7 @@ Ova funkcija uzima sirovi sadržaj fajla i pakuje ga sa metapodacima (ime fajla 
     }
     ```
 
-### - [ ] 1b. Unwarp komponente poruke (`extract_message_component`)
+### - [ ] 1b. (Obavezno) Unwarp komponente poruke (`extract_message_component`)
 Ova funkcija predstavlja obrnuti tok za `create_message_component`. Prima serijalizovan ili pakovan sadržaj poruke i vraća originalni skup metapodataka i sirovih bajtova.
 
 * **Potpis funkcije:**
@@ -42,13 +42,13 @@ Ova funkcija predstavlja obrnuti tok za `create_message_component`. Prima serija
     {
         'filename': str,      # Naziv fajla
         'timestamp': int,     # Vreme kreiranja
-        'data': bytes         # Originalni sirovi podaci fajla
+        'data': str        # Originalni sirovi podaci fajla
     }
     ```
 
 ---
 
-### - [ ] 2. Digitalno potpisivanje (`sign_message`)
+### - [ ] 2. (Opciono) Digitalno potpisivanje (`sign_message`)
 Ukoliko je izabrana opcija potpisivanja, ova funkcija generiše SHA-1 hash nad celokupnom komponentom poruke, šifruje ga privatnim ključem pošiljaoca i generiše potpis.
 
 * **Potpis funkcije:**
@@ -71,7 +71,7 @@ Ukoliko je izabrana opcija potpisivanja, ova funkcija generiše SHA-1 hash nad c
     }
     ```
 
-### - [ ] 2b. Verifikacija potpisa (`verify_signature`)
+### - [ ] 2b. (Opciono) Verifikacija potpisa (`verify_signature`)
 Ova funkcija predstavlja obrnuti tok za `sign_message`. Ona proverava da li je digitalni potpis validan koristeći javni ključ pošiljaoca i da li hash poruke odgovara potpisanim podacima. Ako je potpis ispravan, vraća originalnu komponentu poruke i rezultat provere.
 
 * **Potpis funkcije:**
@@ -93,36 +93,37 @@ Ova funkcija predstavlja obrnuti tok za `sign_message`. Ona proverava da li je d
 
 ---
 
-### - [ ] 3. Kompresija i postavljanje flega (`compress_data`)
-Ova funkcija prima serijalizovane bajtove (bilo samo poruke, bilo paketa sa potpisom) i opciono ih kompresuje. Unutar funkcije se na sam početak bajt streama dodaje 1 bajt koji označava da li je kompresija rađena.
+### - [ ] 3. (Obavezno) Serijalizacija i opciona kompresija (`compress_data`)
+Ova funkcija prima paket u obliku rečnika, prvo ga interno serijalizuje u bajtove, zatim ga opciono kompresuje. Na početak bajt stream-a dodaje se 1 bajt koji označava da li je kompresija rađena.
 
 * **Potpis funkcije:**
     ```python
-    def compress_data(serialized_data: bytes, perform_compression: bool) -> bytes:
+    def compress_data(packet: dict, is_signed: bool, perform_compression: bool) -> bytes:
         pass
     ```
 * **Ulazni argumenti:**
-    * `serialized_data` (`bytes`): Prethodno serijalizovani podaci (bajtovi uspešno pretvoreni iz rečnika koraka 1 ili koraka 2).
-    * `perform_compression` (`bool`): Oznaka da li korisnik želi da se nad podacima izvrši ZIP kompresija.
+    * `packet` (`dict`): Paket koji treba serijalizovati. Može biti obična komponenta poruke ili potpisani paket.
+    * `is_signed` (`bool`): Oznaka da li je prosleđeni paket potpisani paket.
+    * `perform_compression` (`bool`): Oznaka da li korisnik želi da se nad serijalizovanim podacima izvrši ZIP kompresija.
 * **Povratna vrednost (`bytes`):**
     * Niz bajtova koji na poziciji `[0]` ima fleg o kompresiji, a u nastavku podatke.
-    * Ukoliko je `perform_compression=True`: Vraća `b'\x01' + zip_compressed_bytes`
-    * Ukoliko je `perform_compression=False`: Vraća `b'\x00' + serialized_data`
+    * Ukoliko je `perform_compression=True`: Vraća `b'\x01' + zip_compressed_serialized_packet`
+    * Ukoliko je `perform_compression=False`: Vraća `b'\x00' + serialized_packet`
 
-### - [ ] 3b. Dekompresija i uklanjanje flega (`decompress_data`)
-Ova funkcija prima bajtove dobijene nakon dekripcije i vraća originalni sadržaj bez flega za kompresiju. Ukoliko je prvi bajt `b'\x01'`, sadržaj nakon njega se dekompresuje ZIP mehanizmom. Ukoliko je prvi bajt `b'\x00'`, ostatak niza se vraća neizmenjen.
+### - [ ] 3b. (Obavezno) Opciona dekompresija i deserijalizacija (`decompress_data`)
+Ova funkcija prima bajtove dobijene nakon dekripcije, skida fleg kompresije, po potrebi dekompresuje sadržaj i zatim interno deserijalizuje paket.
 
 * **Potpis funkcije:**
     ```python
-    def decompress_data(compressed_bytes: bytes) -> bytes:
+    def decompress_data(compressed_bytes: bytes) -> dict:
         pass
     ```
 * **Ulazni argumenti:**
-    * `compressed_bytes` (`bytes`): Bajtovi iz `decode_radix64` ili `decrypt_message`, sa flegom na početku.
-* **Povratna vrednost (`bytes`):**
-    * Originalni serijalizovani podaci pre kompresije.
-
----
+    * `compressed_bytes` (`bytes`): Bajtovi iz `decode_radix64` ili `decrypt_message`, sa flegom kompresije na početku.
+* **Povratna vrednost (`dict`):**
+    * Deserijalizovani paket.
+    * Ako paket nije bio potpisan, vraća običnu komponentu poruke.
+    * Ako je paket bio potpisan, vraća potpisani paket.
 
 ## DEO 2: Tajnost (Enkripcija) i Radix-64 Prenos
 

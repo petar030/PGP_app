@@ -214,7 +214,6 @@ def import_key_pair(
     save_keyrings()
 
     return deepcopy(public_entry), deepcopy(private_entry)
-
 def export_public_key(key_id: str | bytes, file_path: str) -> None:
     entry = find_public_key(key_id)
 
@@ -240,7 +239,6 @@ def export_key_pair(key_id: str | bytes, unlock_password: str | None, file_path:
         Path(file_path).write_text(content, encoding="utf-8")
 
     
-
 
 # Keyring index searching
 def find_public_key(key_id: str | bytes) -> dict | None:
