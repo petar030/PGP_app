@@ -10,6 +10,8 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
 from cryptography.hazmat.decrepit.ciphers.modes import CFB
 from cryptography.hazmat.primitives import serialization
 
+from rsa_keyring.keyring_utils import key_id_to_bytes
+
 SUPPORTED_CIPHERS = {
     "AES128": algorithms.AES,
     "Cast5": algorithms.CAST5,
@@ -21,18 +23,10 @@ def generate_random_number(length: int) -> bytes:
 
     return os.urandom(length)
 
-
-def _extract_receiver_key_id(receiver_public_key: object) -> bytes:
-    public_key_bytes = receiver_public_key.public_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-    return public_key_bytes[-8:]
-
-
 def encrypt_message(
     compressed_bytes: bytes,
     receiver_public_key: object,
+    receiver_key_id: str,
     symmetric_algo: str,
 ) -> dict[str, Any]:
     """Encrypt the compressed payload and wrap the session key metadata."""
@@ -40,7 +34,7 @@ def encrypt_message(
     if symmetric_algo not in SUPPORTED_CIPHERS:
         raise ValueError(f"Unsupported symmetric algorithm: {symmetric_algo}")
 
-    receiver_key_id = _extract_receiver_key_id(receiver_public_key)
+    receiver_key_id = key_id_to_bytes(receiver_key_id)
 
     # Generating session key and IV
     raw_session_key = generate_random_number(16)
@@ -68,7 +62,6 @@ def encrypt_message(
         "encrypted_data": final_encrypted_data,
     }
 
-
 def decrypt_message(encrypted_message: dict[str, Any], receiver_private_key: object) -> dict[str, Any]:
     """Decrypt the encrypted message using the receiver's private key."""
 
@@ -84,7 +77,7 @@ def decrypt_message(encrypted_message: dict[str, Any], receiver_private_key: obj
     iv = final_encrypted_data[:block_size_bytes]
     ciphertext = final_encrypted_data[block_size_bytes:]
 
-    cipher = Cipher(algo_class(raw_session_key), modes.CFB(iv))
+    cipher = Cipher(algo_class(raw_session_key), CFB(iv))
     decryptor = cipher.decryptor()
     decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
 

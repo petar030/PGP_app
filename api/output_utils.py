@@ -1,7 +1,7 @@
 import os
 
-from encryption_services import SUPPORTED_CIPHERS
-from encryption_services import encrypt_message
+from .encryption_services import SUPPORTED_CIPHERS
+from .encryption_services import encrypt_message
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding

@@ -2,7 +2,7 @@
 
 from .auth_services import create_message_component, sign_message
 from .compression_utils import compress_data
-from .encryption_services import encrypt_message
+from .encryption_services import encrypt_message, decrypt_message
 from .pipeline import build_final_packet
 from .output_utils import (
     decode_radix64,
@@ -16,6 +16,7 @@ __all__ = [
     "sign_message",
     "compress_data",
     "encrypt_message",
+    "decrypt_message",
     "serialize_final_packet",
     "deserialize_final_packet",
     "encode_radix64",

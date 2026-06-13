@@ -137,6 +137,7 @@ Ova funkcija generiše jednokratni ključ sesije ($K_s$) za izabrani simetrični
 * **Ulazni argumenti:**
     * `compressed_bytes` (`bytes`): Finalni niz bajtova dobijen iz `compress_data` (sadrži fleg na početku).
     * `receiver_public_key` (`object`): RSA javni ključ primaoca poruke.
+    * `receiver_key_id` (`str`): Hex vrednost id-ja
     * `symmetric_algo` (`str`): Naziv izabranog simetričnog algoritma (npr. `'AES128'`, `'3DES'`).
 * **Povratna vrednost (`dict`):**
     ```python
@@ -173,7 +174,7 @@ Ovaj deo definiše dva alternativna izlaza za isti ulazni rečnik iz prethodne f
 * čista binarna serijalizacija preko `serialize_final_packet`
 * ASCII oklop preko `encode_radix64`, koji koristi isti ulazni `data_dict` i interno prvo radi serijalizaciju, pa onda Base64 omotavanje
 
-### - [ ] 5. Čista serijalizacija finalnog paketa (`serialize_final_packet`)
+### - [x] 5. Čista serijalizacija finalnog paketa (`serialize_final_packet`)
 
 
 **Format (Big-Endian):**
@@ -190,12 +191,12 @@ Ovaj deo definiše dva alternativna izlaza za isti ulazni rečnik iz prethodne f
 
 * **Potpis:** `def serialize_final_packet(data_dict: dict, is_encrypted: bool) -> bytes:`
 
-### - [ ] 5b. Unwrap finalnog paketa (`deserialize_final_packet`)
+### - [x] 5b. Unwrap finalnog paketa (`deserialize_final_packet`)
 Parsira binarni stream i rekonstruiše rečnik.
 
 * **Potpis:** `def deserialize_final_packet(serialized_packet: bytes) -> dict:`
 
-### - [ ] 6. Radix-64 kodiranje (`encode_radix64`)
+### - [x] 6. Radix-64 kodiranje (`encode_radix64`)
 Opcioni korak koji uzima isti ulazni rečnik kao `serialize_final_packet`, interno ga serijalizuje i zatim konvertuje binarni izlaz u Base64 ASCII string sa PGP zaglavljima.
 
 * **Potpis:** `def encode_radix64(serialized_data) -> str:`
@@ -206,7 +207,9 @@ Opcioni korak koji uzima isti ulazni rečnik kao `serialize_final_packet`, inter
     -----END PGP MESSAGE-----
     ```
 
-### - [ ] 6b. Radix-64 dekodiranje (`decode_radix64`)
+### - [x] 6b. Radix-64 dekodiranje (`decode_radix64`)
 Skida PGP zaglavlja i dekodira Base64 u originalni binarni niz bajtova.
 
 * **Potpis:** `def decode_radix64(armored_message: str) -> bytes:`
+
+
