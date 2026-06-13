@@ -542,12 +542,3 @@ export_public_key(public_entry["key_id"], "petar_public.pem")
 export_key_pair(private_entry["key_id"], "password", "petar_pair.pem")
 ```
 
-## Napomena za odbranu
-
-Prstenovi ključeva su implementirani kao lokalni JSON fajlovi.
-
-Svaki prsten je `dict[str, dict]`, gde je ključ mape `key_id`, a vrednost je entry sa podacima o ključu.
-
-Takva struktura omogućava direktnu pretragu po `key_id` bez linearne pretrage kroz listu.
-
-Privatni ključevi se lokalno čuvaju isključivo kao šifrovani PEM.
