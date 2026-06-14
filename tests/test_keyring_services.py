@@ -222,6 +222,58 @@ class TestKeyringServices(unittest.TestCase):
         self.assertIn("-----BEGIN PUBLIC KEY-----", content)
         self.assertIn("-----END PUBLIC KEY-----", content)
 
+    def test_export_public_key_can_include_metadata(self):
+        public_entry, _ = services.generate_key_pair(
+            user_name="Petar Rancic",
+            email="petar@example.com",
+            key_size=1024,
+            password="test-password",
+        )
+
+        output_path = self.temp_path / "exported_public_with_metadata.pem"
+
+        services.export_public_key(public_entry["key_id"], str(output_path), include_metadata=True)
+
+        content = output_path.read_text(encoding="utf-8")
+
+        self.assertIn("# PGP-APP-METADATA-BEGIN", content)
+        self.assertIn("# User-Name: Petar Rancic", content)
+        self.assertIn("# Email: petar@example.com", content)
+        self.assertIn(f"# Timestamp: {public_entry['timestamp']}", content)
+        self.assertIn(f"# Key-ID: {public_entry['key_id']}", content)
+        self.assertIn("# PGP-APP-METADATA-END", content)
+
+    def test_import_public_key_uses_explicit_metadata_arguments(self):
+        public_entry, _ = services.generate_key_pair(
+            user_name="Petar Rancic",
+            email="petar@example.com",
+            key_size=1024,
+            password="test-password",
+        )
+
+        output_path = self.temp_path / "exported_public_with_metadata.pem"
+        services.export_public_key(public_entry["key_id"], str(output_path), include_metadata=True)
+
+        services.delete_public_key(public_entry["key_id"])
+
+        imported_entry = services.import_public_key(file_path=str(output_path))
+
+        self.assertEqual(imported_entry["user_name"], "")
+        self.assertEqual(imported_entry["email"], "")
+
+        services.delete_public_key(public_entry["key_id"])
+
+        imported_entry = services.import_public_key(
+            file_path=str(output_path),
+            user_name="Imported From GUI",
+            email="gui@example.com",
+            timestamp=public_entry["timestamp"],
+        )
+
+        self.assertEqual(imported_entry["user_name"], "Imported From GUI")
+        self.assertEqual(imported_entry["email"], "gui@example.com")
+        self.assertEqual(imported_entry["timestamp"], public_entry["timestamp"])
+
     def test_import_public_key_from_exported_pem(self):
         public_entry, _ = services.generate_key_pair(
             user_name="Petar Rancic",

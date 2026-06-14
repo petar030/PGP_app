@@ -26,6 +26,8 @@ from .keyring_utils import (
 _public_keyring: dict[str, dict] = {}
 _private_keyring: dict[str, dict] = {}
 _initialized = False
+METADATA_BEGIN = "# PGP-APP-METADATA-BEGIN"
+METADATA_END = "# PGP-APP-METADATA-END"
 
 
 # Keyring initialization
@@ -95,6 +97,7 @@ def import_key(
     file_path: str,
     user_name: str = "",
     email: str = "",
+    timestamp: int | None = None,
     private_key_pem_password: str | None = None,
     keyring_password: str | None = None,
 ) -> dict | tuple[dict, dict]:
@@ -113,6 +116,7 @@ def import_key(
             file_path=file_path,
             user_name=user_name,
             email=email,
+            timestamp=timestamp,
             private_key_pem_password=private_key_pem_password,
             keyring_password=keyring_password,
         )
@@ -121,8 +125,9 @@ def import_key(
         file_path=file_path,
         user_name=user_name,
         email=email,
+        timestamp=timestamp,
     )
-def import_public_key(file_path: str, user_name: str = "", email: str = "") -> dict:
+def import_public_key(file_path: str, user_name: str = "", email: str = "", timestamp: int | None = None) -> dict:
     _ensure_initialized()
 
     pem_content = Path(file_path).read_text(encoding="utf-8")
@@ -130,6 +135,7 @@ def import_public_key(file_path: str, user_name: str = "", email: str = "") -> d
     public_key = load_public_key_from_pem(public_key_pem)
 
     key_id = calculate_key_id_hex(public_key)
+    timestamp = int(time.time()) if timestamp is None else int(timestamp)
 
     if key_id in _public_keyring:
         raise ValueError("Public key already exists")
@@ -138,7 +144,7 @@ def import_public_key(file_path: str, user_name: str = "", email: str = "") -> d
         "key_id": key_id,
         "user_name": user_name.strip(),
         "email": email.strip(),
-        "timestamp": int(time.time()),
+        "timestamp": timestamp,
         "key_size": public_key.key_size,
         "public_key_pem": serialize_public_key_to_pem(public_key),
     }
@@ -151,6 +157,7 @@ def import_key_pair(
     file_path: str,
     user_name: str = "",
     email: str = "",
+    timestamp: int | None = None,
     private_key_pem_password: str | None = None,
     keyring_password: str | None = None,
 ) -> tuple[dict, dict]:
@@ -163,7 +170,7 @@ def import_key_pair(
 
     public_key = load_public_key_from_pem(public_key_pem)
 
-    timestamp = int(time.time())
+    timestamp = int(time.time()) if timestamp is None else int(timestamp)
     key_id = calculate_key_id_hex(public_key)
     normalized_public_key_pem = serialize_public_key_to_pem(public_key)
 
@@ -214,28 +221,34 @@ def import_key_pair(
     save_keyrings()
 
     return deepcopy(public_entry), deepcopy(private_entry)
-def export_public_key(key_id: str | bytes, file_path: str) -> None:
+def export_public_key(key_id: str | bytes, file_path: str, include_metadata: bool = False) -> None:
     entry = find_public_key(key_id)
 
     if entry is None:
         raise ValueError("Public key not found")
 
-    Path(file_path).write_text(entry["public_key_pem"], encoding="utf-8")
-def export_key_pair(key_id: str | bytes, unlock_password: str | None, file_path: str) -> None:
+    content = entry["public_key_pem"]
+
+    if include_metadata:
+        content = _metadata_block(entry) + content
+
+    Path(file_path).write_text(content, encoding="utf-8")
+def export_key_pair(key_id: str | bytes, unlock_password: str | None, file_path: str, include_metadata: bool = False) -> None:
     private_entry = find_private_key(key_id)
 
     if private_entry is None:
         raise ValueError("Key pair not found")
 
+    metadata = _metadata_block(private_entry) if include_metadata else ""
 
     if unlock_password is None:
-        content = private_entry["public_key_pem"].strip() + "\n" + private_entry["encrypted_private_key_pem"].strip() + "\n"
+        content = metadata + private_entry["public_key_pem"].strip() + "\n" + private_entry["encrypted_private_key_pem"].strip() + "\n"
         Path(file_path).write_text(content, encoding="utf-8")
 
     else:
         private_key = load_private_key_from_pem(private_entry["encrypted_private_key_pem"], unlock_password)
         private_key_pem = serialize_private_key_to_pem(private_key, unlock_password, encrypted=False)
-        content = private_entry["public_key_pem"].strip() + "\n" + private_key_pem.strip() + "\n"
+        content = metadata + private_entry["public_key_pem"].strip() + "\n" + private_key_pem.strip() + "\n"
         Path(file_path).write_text(content, encoding="utf-8")
 
     
@@ -302,6 +315,20 @@ def delete_key_pair(key_id: str | bytes) -> bool:
 def _ensure_initialized() -> None:
     if not _initialized:
         initialize_keyrings()
+def _metadata_block(entry: dict) -> str:
+    lines = [
+        METADATA_BEGIN,
+        f"# User-Name: {_sanitize_metadata_value(entry.get('user_name', ''))}",
+        f"# Email: {_sanitize_metadata_value(entry.get('email', ''))}",
+        f"# Timestamp: {_sanitize_metadata_value(entry.get('timestamp', ''))}",
+        f"# Key-ID: {_sanitize_metadata_value(entry.get('key_id', ''))}",
+        METADATA_END,
+        "",
+    ]
+
+    return "\n".join(lines)
+def _sanitize_metadata_value(value) -> str:
+    return str(value).replace("\r", " ").replace("\n", " ").strip()
 def _normalize_keyring(keyring: dict[str, dict]) -> dict[str, dict]:
     normalized = {}
 

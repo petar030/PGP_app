@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -20,6 +21,10 @@ from PyQt6.QtWidgets import (
 
 import rsa_keyring.keyring_services as keyring_services
 from gui.generate_key_dialog import GenerateKeyDialog
+
+
+METADATA_BEGIN = "# PGP-APP-METADATA-BEGIN"
+METADATA_END = "# PGP-APP-METADATA-END"
 
 class KeyCard(QFrame):
     def __init__(self, entry: dict, key_type: str, on_click):
@@ -451,29 +456,40 @@ class KeyManagementPage(QWidget):
         if not file_path:
             return
 
-        user_name, ok = QInputDialog.getText(
-            self,
-            "Key Owner",
-            "Name:",
-        )
+        metadata = self.extract_key_file_metadata(file_path)
+        has_owner_metadata = bool(metadata.get("user_name") and metadata.get("email"))
+        timestamp = self.metadata_timestamp(metadata)
 
-        if not ok:
-            return
+        if has_owner_metadata:
+            user_name = metadata.get("user_name", "")
+            email = metadata.get("email", "")
+        else:
+            user_name, ok = QInputDialog.getText(
+                self,
+                "Key Owner",
+                "Name:",
+                text=metadata.get("user_name", ""),
+            )
 
-        email, ok = QInputDialog.getText(
-            self,
-            "Key Owner",
-            "Email:",
-        )
+            if not ok:
+                return
 
-        if not ok:
-            return
+            email, ok = QInputDialog.getText(
+                self,
+                "Key Owner",
+                "Email:",
+                text=metadata.get("email", ""),
+            )
+
+            if not ok:
+                return
 
         try:
             result = keyring_services.import_key(
                 file_path=file_path,
                 user_name=user_name,
                 email=email,
+                timestamp=timestamp,
             )
 
             self.refresh_cards()
@@ -514,6 +530,7 @@ class KeyManagementPage(QWidget):
                         file_path=file_path,
                         user_name=user_name,
                         email=email,
+                        timestamp=timestamp,
                         keyring_password=password,
                     )
 
@@ -561,6 +578,8 @@ class KeyManagementPage(QWidget):
         key_id = self.selected_entry["key_id"]
 
         if self.selected_key_type == "public":
+            include_metadata = self.ask_include_metadata()
+
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Export Public Key",
@@ -572,7 +591,11 @@ class KeyManagementPage(QWidget):
                 return
 
             try:
-                keyring_services.export_public_key(key_id, file_path)
+                keyring_services.export_public_key(
+                    key_id,
+                    file_path,
+                    include_metadata=include_metadata,
+                )
 
                 QMessageBox.information(
                     self,
@@ -590,6 +613,8 @@ class KeyManagementPage(QWidget):
             return
 
         if self.selected_key_type == "private":
+            include_metadata = self.ask_include_metadata()
+
             # password, ok = QInputDialog.getText(
             #     self,
             #     "Unlock Private Key",
@@ -615,6 +640,7 @@ class KeyManagementPage(QWidget):
                     key_id=key_id,
                     unlock_password=None,
                     file_path=file_path,
+                    include_metadata=include_metadata,
                 )
 
                 QMessageBox.information(
@@ -629,6 +655,68 @@ class KeyManagementPage(QWidget):
                     "Export Failed",
                     str(e),
                 )
+
+    def ask_include_metadata(self):
+        answer = QMessageBox.question(
+            self,
+            "Export Metadata",
+            "Do you want to include key owner metadata (name, email, timestamp) in the PEM file?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+
+        return answer == QMessageBox.StandardButton.Yes
+
+    def extract_key_file_metadata(self, file_path: str):
+        try:
+            content = Path(file_path).read_text(encoding="utf-8")
+        except Exception:
+            return {}
+
+        if METADATA_BEGIN not in content or METADATA_END not in content:
+            return {}
+
+        start = content.find(METADATA_BEGIN) + len(METADATA_BEGIN)
+        end = content.find(METADATA_END, start)
+
+        if end == -1:
+            return {}
+
+        metadata = {}
+        key_map = {
+            "User-Name": "user_name",
+            "Email": "email",
+            "Timestamp": "timestamp",
+            "Key-ID": "key_id",
+        }
+
+        for raw_line in content[start:end].splitlines():
+            line = raw_line.strip()
+
+            if line.startswith("#"):
+                line = line[1:].strip()
+
+            if ":" not in line:
+                continue
+
+            key, value = line.split(":", 1)
+            normalized_key = key_map.get(key.strip())
+
+            if normalized_key:
+                metadata[normalized_key] = value.strip()
+
+        return metadata
+
+    def metadata_timestamp(self, metadata: dict):
+        timestamp = metadata.get("timestamp")
+
+        if timestamp is None:
+            return None
+
+        try:
+            return int(float(timestamp))
+        except (TypeError, ValueError):
+            return None
 
     def on_delete_clicked(self):
         if self.selected_entry is None:
