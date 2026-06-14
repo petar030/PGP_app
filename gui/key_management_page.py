@@ -498,6 +498,55 @@ class KeyManagementPage(QWidget):
                 )
 
         except Exception as e:
+            if "Keyring password is required" in str(e):
+                password, ok = QInputDialog.getText(
+                    self,
+                    "Protect Imported Private Key",
+                    "Enter keyring password for imported private key:",
+                    QLineEdit.EchoMode.Password,
+                )
+
+                if not ok:
+                    return
+
+                try:
+                    result = keyring_services.import_key(
+                        file_path=file_path,
+                        user_name=user_name,
+                        email=email,
+                        keyring_password=password,
+                    )
+
+                    self.refresh_cards()
+
+                    if isinstance(result, tuple):
+                        public_entry, private_entry = result
+                        self.show_entry_details(private_entry, "private")
+
+                        QMessageBox.information(
+                            self,
+                            "Import Successful",
+                            "Key pair has been imported successfully.",
+                        )
+                    else:
+                        public_entry = result
+                        self.show_entry_details(public_entry, "public")
+
+                        QMessageBox.information(
+                            self,
+                            "Import Successful",
+                            "Public key has been imported successfully.",
+                        )
+
+                except Exception as retry_error:
+                    QMessageBox.critical(
+                        self,
+                        "Import Failed",
+                        str(retry_error),
+                    )
+
+                return
+
             QMessageBox.critical(
                 self,
                 "Import Failed",

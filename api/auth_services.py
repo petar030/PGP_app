@@ -27,9 +27,10 @@ def extract_message_component(packed_message: dict) -> dict:
     }
 
 def sign_message(message_component: dict, sender_private_key: object, sender_key_id: str) -> dict:
+    sig_timestamp = datetime.now().timestamp()
     hasher = hashlib.sha1()
     hasher.update(message_component['data'])
-    hasher.update(str(int(datetime.now().timestamp())).encode('utf-8'))
+    hasher.update(str(int(sig_timestamp)).encode('utf-8'))
     message_digest = hasher.digest()
 
     leading_octets = message_digest[:2]
@@ -41,7 +42,7 @@ def sign_message(message_component: dict, sender_private_key: object, sender_key
 
     return {
         'sender_key_id': sender_key_id,
-        'sig_timestamp': datetime.now().timestamp(),
+        'sig_timestamp': sig_timestamp,
         'leading_octets': leading_octets,
         'encrypted_hash': encrypted_hash,
         'message_comp': message_component
