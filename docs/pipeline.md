@@ -214,3 +214,22 @@ Skida PGP zaglavlja i dekodira Base64 u originalni binarni niz bajtova.
 * **Potpis:** `def decode_radix64(armored_message: str) -> bytes:`
 
 
+## Send message flow
+
+1. Input data and filename
+2. ```create_message_component(data, filename)```
+3. Sign: Yes -> 4, No -> 7
+4. Choose private key, key_id
+5. Get private key object
+6. ```sign_message(...)```
+7. Perform compression: Yes, No
+8. ```compress_data(...)``` // this function is called even if the answer to previous question is No
+9. encrypt: Yes -> 10, No -> 13
+10. Choose public key for encryption, key_id, get public key object
+11. Choose simmetric algorithm
+12. ```data_dict = encrypt_message(...)```
+13. If not encrypted data_dict['data'] = compression_data_output
+14. ```serialize_final_packet(...)```
+15. Choose radix: Yes -> 16, No -> 17
+16. ```encode_radix(...)```
+17. Write to file
