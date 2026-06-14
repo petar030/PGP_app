@@ -6,7 +6,7 @@ Ovaj dokument služi kao kontrolna lista (Checklist) i tehnička specifikacija z
 
 ## DEO 1: Priprema podataka, Autentikacija i Kompresija
 
-### - [ ] 1. (Obavezno) Kreiranje komponente poruke (`create_message_component`)
+### - [x] 1. (Obavezno) Kreiranje komponente poruke (`create_message_component`)
 Ova funkcija uzima sirovi sadržaj fajla i pakuje ga sa metapodacima (ime fajla i vreme).
 
 * **Potpis funkcije:**
@@ -27,7 +27,7 @@ Ova funkcija uzima sirovi sadržaj fajla i pakuje ga sa metapodacima (ime fajla 
     }
     ```
 
-### - [ ] 1b. (Obavezno) Unwarp komponente poruke (`extract_message_component`)
+### - [x] 1b. (Obavezno) Unwarp komponente poruke (`extract_message_component`)
 Ova funkcija predstavlja obrnuti tok za `create_message_component`. Prima serijalizovan ili pakovan sadržaj poruke i vraća originalni skup metapodataka i sirovih bajtova.
 
 * **Potpis funkcije:**
@@ -48,7 +48,7 @@ Ova funkcija predstavlja obrnuti tok za `create_message_component`. Prima serija
 
 ---
 
-### - [ ] 2. (Opciono) Digitalno potpisivanje (`sign_message`)
+### - [x] 2. (Opciono) Digitalno potpisivanje (`sign_message`)
 Ukoliko je izabrana opcija potpisivanja, ova funkcija generiše SHA-1 hash nad celokupnom komponentom poruke, šifruje ga privatnim ključem pošiljaoca i generiše potpis.
 
 * **Potpis funkcije:**
@@ -71,7 +71,7 @@ Ukoliko je izabrana opcija potpisivanja, ova funkcija generiše SHA-1 hash nad c
     }
     ```
 
-### - [ ] 2b. (Opciono) Verifikacija potpisa (`verify_signature`)
+### - [x] 2b. (Opciono) Verifikacija potpisa (`verify_signature`)
 Ova funkcija predstavlja obrnuti tok za `sign_message`. Ona proverava da li je digitalni potpis validan koristeći javni ključ pošiljaoca i da li hash poruke odgovara potpisanim podacima. Ako je potpis ispravan, vraća originalnu komponentu poruke i rezultat provere.
 
 * **Potpis funkcije:**
@@ -93,7 +93,7 @@ Ova funkcija predstavlja obrnuti tok za `sign_message`. Ona proverava da li je d
 
 ---
 
-### - [ ] 3. (Obavezno) Serijalizacija i opciona kompresija (`compress_data`)
+### - [x] 3. (Obavezno) Serijalizacija i opciona kompresija (`compress_data`)
 Ova funkcija prima paket u obliku rečnika, prvo ga interno serijalizuje u bajtove, zatim ga opciono kompresuje. Na početak bajt stream-a dodaje se 1 bajt koji označava da li je kompresija rađena.
 
 * **Potpis funkcije:**
@@ -110,7 +110,7 @@ Ova funkcija prima paket u obliku rečnika, prvo ga interno serijalizuje u bajto
     * Ukoliko je `perform_compression=True`: Vraća `b'\x01' + zip_compressed_serialized_packet`
     * Ukoliko je `perform_compression=False`: Vraća `b'\x00' + serialized_packet`
 
-### - [ ] 3b. (Obavezno) Opciona dekompresija i deserijalizacija (`decompress_data`)
+### - [x] 3b. (Obavezno) Opciona dekompresija i deserijalizacija (`decompress_data`)
 Ova funkcija prima bajtove dobijene nakon dekripcije, skida fleg kompresije, po potrebi dekompresuje sadržaj i zatim interno deserijalizuje paket.
 
 * **Potpis funkcije:**
