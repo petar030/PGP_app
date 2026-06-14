@@ -256,15 +256,21 @@ def get_public_key_object(key_id: str | bytes):
         raise ValueError("Public key not found")
 
     return load_public_key_from_pem(entry["public_key_pem"])
+def get_private_key_object(key_id: str | bytes, password: str):
+    return unlock_private_key(key_id, password)
+def unlock_private_key(key_id: str | bytes, password: str):
+    entry = find_private_key(key_id)
+
+    if entry is None:
+        raise ValueError("Private key not found")
+
+    return load_private_key_from_pem(entry["encrypted_private_key_pem"], password)
 
 
 # Deleting keys
 def delete_public_key(key_id: str | bytes) -> bool:
     _ensure_initialized()
     key_id_hex = key_id_to_hex(key_id)
-
-    if key_id_hex in _private_keyring:
-        raise ValueError("Cannot delete public key because matching private key exists")
 
     if key_id_hex not in _public_keyring:
         return False
@@ -288,6 +294,8 @@ def delete_private_key(key_id: str | bytes, delete_public_key_entry: bool = Fals
     save_keyrings()
 
     return True
+def delete_key_pair(key_id: str | bytes) -> bool:
+    return delete_private_key(key_id, delete_public_key_entry=True)
 
 
 # Helper functions
@@ -335,5 +343,3 @@ def _extract_key_pem_block(content: str, is_private: bool = False) -> str:
     # Ako petlja završi, a ništa nismo našli, bacamo grešku
     key_type = "private" if is_private else "public"
     raise ValueError(f"Missing {key_type} key PEM block")
-
-
