@@ -1,8 +1,42 @@
 from PyQt6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QPushButton, QStackedWidget, QVBoxLayout, QWidget
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from gui.key_management_page import KeyManagementPage
+from gui.receive_message_page import ReceiveMessagePage
 from gui.send_message_page import SendMessagePage
+
+
+class SidebarButton(QFrame):
+    clicked = pyqtSignal()
+
+    def __init__(self, emoji: str, text: str):
+        super().__init__()
+
+        self.setObjectName("SidebarButton")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(84)
+
+        emoji_label = QLabel(emoji)
+        emoji_label.setObjectName("SidebarButtonEmoji")
+        emoji_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        text_label = QLabel(text)
+        text_label.setObjectName("SidebarButtonText")
+        text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        text_label.setWordWrap(True)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(2)
+        layout.addWidget(emoji_label)
+        layout.addWidget(text_label)
+        self.setLayout(layout)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+
+        super().mousePressEvent(event)
 
 
 class MainWindow(QWidget):
@@ -16,25 +50,26 @@ class MainWindow(QWidget):
         self.sidebar.setObjectName("Sidebar")
         self.sidebar.setFixedWidth(150)
 
-        self.send_button = QPushButton("✉\nSend Message")
-        self.keyring_button = QPushButton("🔑\nKey Management")
-
-        self.send_button.setObjectName("SidebarButton")
-        self.keyring_button.setObjectName("SidebarButton")
+        self.send_button = SidebarButton("✉", "Send Message")
+        self.receive_button = SidebarButton("📥", "Receive Message")
+        self.keyring_button = SidebarButton("🔑", "Key Management")
 
         sidebar_layout = QVBoxLayout()
         sidebar_layout.setContentsMargins(8, 16, 8, 8)
         sidebar_layout.setSpacing(12)
         sidebar_layout.addWidget(self.send_button)
+        sidebar_layout.addWidget(self.receive_button)
         sidebar_layout.addWidget(self.keyring_button)
         sidebar_layout.addStretch()
         self.sidebar.setLayout(sidebar_layout)
 
         self.stack = QStackedWidget()
         self.send_page = SendMessagePage()
+        self.receive_page = ReceiveMessagePage()
         self.key_management_page = KeyManagementPage()
 
         self.stack.addWidget(self.send_page)
+        self.stack.addWidget(self.receive_page)
         self.stack.addWidget(self.key_management_page)
 
         root_layout = QHBoxLayout()
@@ -46,6 +81,7 @@ class MainWindow(QWidget):
         self.setLayout(root_layout)
 
         self.send_button.clicked.connect(lambda: self.stack.setCurrentWidget(self.send_page))
+        self.receive_button.clicked.connect(lambda: self.stack.setCurrentWidget(self.receive_page))
         self.keyring_button.clicked.connect(lambda: self.stack.setCurrentWidget(self.key_management_page))
 
         self.stack.setCurrentWidget(self.key_management_page)
@@ -77,6 +113,21 @@ class MainWindow(QWidget):
 
         #SidebarButton:hover {
             background-color: #3a4651;
+        }
+
+        #SidebarButtonEmoji {
+            background-color: transparent;
+            border: none;
+            color: #f0f0f0;
+            font-size: 28px;
+        }
+
+        #SidebarButtonText {
+            background-color: transparent;
+            border: none;
+            color: #f0f0f0;
+            font-size: 12px;
+            font-weight: bold;
         }
 
         #PageTitle {

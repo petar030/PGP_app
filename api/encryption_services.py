@@ -7,7 +7,7 @@ from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
-from cryptography.hazmat.primitives.ciphers.modes import CFB
+from cryptography.hazmat.decrepit.ciphers.modes import CFB
 from cryptography.hazmat.primitives import serialization
 
 from rsa_keyring.keyring_utils import key_id_to_bytes
