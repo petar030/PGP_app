@@ -254,7 +254,7 @@ class TestKeyringServices(unittest.TestCase):
         output_path = self.temp_path / "exported_public_with_metadata.pem"
         services.export_public_key(public_entry["key_id"], str(output_path), include_metadata=True)
 
-        services.delete_public_key(public_entry["key_id"])
+        services.delete_key_pair(public_entry["key_id"])
 
         imported_entry = services.import_public_key(file_path=str(output_path))
 
@@ -285,7 +285,7 @@ class TestKeyringServices(unittest.TestCase):
         output_path = self.temp_path / "exported_public.pem"
         services.export_public_key(public_entry["key_id"], str(output_path))
 
-        services.delete_public_key(public_entry["key_id"])
+        services.delete_key_pair(public_entry["key_id"])
 
         imported_entry = services.import_public_key(
             file_path=str(output_path),
@@ -463,19 +463,40 @@ class TestKeyringServices(unittest.TestCase):
                 email="invalid@example.com",
             )
 
-    def test_delete_public_key_removes_only_public_entry(self):
-        public_entry, private_entry = services.generate_key_pair(
+    def test_delete_public_key_removes_public_only_entry(self):
+        public_entry, _ = services.generate_key_pair(
             user_name="Petar Rancic",
             email="petar@example.com",
             key_size=1024,
             password="test-password",
         )
 
-        result = services.delete_public_key(public_entry["key_id"])
+        output_path = self.temp_path / "public_only.pem"
+        services.export_public_key(public_entry["key_id"], str(output_path))
+
+        services.delete_key_pair(public_entry["key_id"])
+
+        imported_entry = services.import_public_key(file_path=str(output_path))
+
+        result = services.delete_public_key(imported_entry["key_id"])
 
         self.assertTrue(result)
-        self.assertIsNone(services.find_public_key(public_entry["key_id"]))
-        self.assertIsNotNone(services.find_private_key(private_entry["key_id"]))
+        self.assertIsNone(services.find_public_key(imported_entry["key_id"]))
+        self.assertIsNone(services.find_private_key(imported_entry["key_id"]))
+
+    def test_delete_public_key_with_matching_private_key_raises_value_error(self):
+        public_entry, _ = services.generate_key_pair(
+            user_name="Petar Rancic",
+            email="petar@example.com",
+            key_size=1024,
+            password="test-password",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Cannot delete public key because matching private key exists",
+        ):
+            services.delete_public_key(public_entry["key_id"])
 
     def test_delete_key_pair_removes_public_and_private_entries(self):
         public_entry, private_entry = services.generate_key_pair(
